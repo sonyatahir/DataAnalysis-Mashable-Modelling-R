@@ -1,0 +1,588 @@
+---
+title: "Final Project"
+author: "Sonya Tahir"
+date: "May 6, 2016"
+output: word_document
+---
+
+# Loading Data
+```{r}
+setwd("C:/Sonya/GW/Data Analysis/Assignments/ProjectFinal")
+newsData <- read.csv("OnlineNewsPopularity.csv", header = TRUE, sep = ",")
+
+#removing non-predictive variables
+newsData$url <- NULL
+newsData$timedelta <- NULL
+
+```
+
+# Summary and Scatterplots
+
+```{r}
+dim(newsData)
+summary(newsData)
+
+plot(newsData[,1:5])
+plot(newsData[,6:10])
+plot(newsData[,11:15])
+
+#library(ggplot2)
+#library(reshape)
+#newsDataMelt = melt(newsData)
+#ggplot(newsDataMelt,aes(x=value))+geom_density()+facet_wrap(~variable,scales="free")
+#remove(newsDataMelt)
+```
+
+# Correlation
+
+```{r}
+newsCorr <- cor(newsData, method = "pearson")
+image(t(newsCorr)[ncol(newsCorr):1,])
+write.csv(newsCorr,"correlation.csv")
+
+library(usdm)
+vifScores <- vif(newsData)
+vifScores
+```
+
+## Removing correlated variables
+
+```{r}
+newsData$n_non_stop_words <- NULL
+newsData$n_non_stop_unique_tokens <- NULL
+
+newsData$kw_avg_min <- NULL
+newsData$kw_avg_max <- NULL
+newsData$kw_avg_avg <- NULL
+newsData$self_reference_avg_sharess <- NULL
+
+newsData$rate_positive_words <- NULL
+newsData$rate_negative_words <- NULL
+
+
+```
+
+# Creating weekday variable
+```{r}
+newsData$weekday <- 0
+newsData$weekday[newsData$weekday_is_monday==1] <- 1
+newsData$weekday[newsData$weekday_is_tuesday==1] <- 2
+newsData$weekday[newsData$weekday_is_wednesday==1] <- 3
+newsData$weekday[newsData$weekday_is_thursday==1] <- 4
+newsData$weekday[newsData$weekday_is_friday==1] <- 5
+newsData$weekday[newsData$weekday_is_saturday==1] <- 6
+newsData$weekday[newsData$weekday_is_sunday==1] <- 7
+
+newsData$weekday_is_monday <- NULL
+newsData$weekday_is_tuesday <- NULL
+newsData$weekday_is_wednesday <- NULL
+newsData$weekday_is_thursday <- NULL
+newsData$weekday_is_friday <- NULL
+newsData$weekday_is_saturday <- NULL
+newsData$weekday_is_sunday <- NULL
+
+```
+
+# Creating data_channel variable
+
+```{r}
+newsData$data_channel <- 0
+newsData$data_channel[newsData$data_channel_is_lifestyle==1] <- 1
+newsData$data_channel[newsData$data_channel_is_entertainment==1] <- 2
+newsData$data_channel[newsData$data_channel_is_bus==1] <- 3
+newsData$data_channel[newsData$data_channel_is_socmed==1] <- 4
+newsData$data_channel[newsData$data_channel_is_tech==1] <- 5
+newsData$data_channel[newsData$data_channel_is_world==1] <- 6
+
+
+newsData$data_channel_is_lifestyle <- NULL
+newsData$data_channel_is_entertainment <- NULL
+newsData$data_channel_is_bus <- NULL
+newsData$data_channel_is_socmed <- NULL
+newsData$data_channel_is_tech <- NULL
+newsData$data_channel_is_world <- NULL
+
+#write.csv(newsData, "newsBackup.csv")
+#newsBackup <- newsData
+```
+
+
+# PCA and Clustering Analysis
+
+```{r}
+#removing the target variable for this analysis
+newsBackup <- newsData
+#newsData$shares <- NULL
+
+```
+
+## PCA 
+```{r}
+fit <- prcomp(newsData[1:37], scale = TRUE)
+summary(fit)
+```
+
+
+## Scree Plot
+
+```{r}
+plot(fit,type="lines") #scree plot
+
+fit.var=fit$sdev^2
+pve=fit.var/sum(fit.var)
+pve
+
+sum(pve[1:11])
+```
+
+## Loading Vector for Significant PCs
+
+```{r}
+fit$rotation[,1:13]
+```
+
+## Plot projection of data on to the first two PCs
+
+```{r}
+biplot (fit , scale =0)
+```
+
+## Hierarchical Clustering
+
+```{r}
+set.seed(5)
+newsDataSample <- newsData[sample(nrow(newsData), 100), ]
+sampleScaled <- scale(newsDataSample[1:37])
+df.dist <- dist(sampleScaled,method = "euclidean") 
+hclust.single <- hclust(df.dist, method="single")
+plot(hclust.single)
+hclust.complete <- hclust(df.dist, method="complete")
+plot(hclust.complete)
+
+```
+
+## K-Means Clustering
+
+```{r}
+#Running k-means on sample to see which number of clusters is the best
+kms1 = kmeans (sampleScaled,1, nstart =20)
+kms1$tot.withinss
+kms2 = kmeans (sampleScaled,2, nstart =20)
+kms2$tot.withinss
+kms3 = kmeans (sampleScaled,3, nstart =20)
+kms3$tot.withinss
+kms4 = kmeans (sampleScaled,4, nstart =20)
+kms4$tot.withinss
+kms5 = kmeans (sampleScaled,5, nstart =20)
+kms5$tot.withinss
+kms7 = kmeans (sampleScaled,7, nstart =20)
+kms7$tot.withinss
+kms10 = kmeans (sampleScaled,10, nstart =20)
+kms10$tot.withinss
+kms15 = kmeans (sampleScaled,15, nstart =20)
+kms15$tot.withinss
+
+#Running k-means with k=2 on whole data to identify rows in the small cluster for detailed observation.
+newsDataScaled <- scale(data03)
+kmsall2 = kmeans (newsDataScaled,2, nstart =20)
+
+```
+
+Plotting the clusters
+```{r}
+library(cluster);
+clusplot(newsDataScaled, kmsall2$cluster, color=TRUE, shade=TRUE,
+labels=1, lines=0)
+
+sum(kmsall2$cluster==1)
+sum(kmsall2$cluster==2)
+
+write.csv(kmsall2$cluster,"clusters.csv")
+
+newsBackup$cluster <- kmsall2$cluster
+newsData$cluster <- kmsall2$cluster
+smallClusterData <- newsData[newsData$cluster==1,]
+
+#Because I deleted the target from newsData for PCA and clustering
+newsData <- newsBackup
+newsData$shares <- NULL
+newsData$shares <- newsBackup$shares
+write.csv(newsBackup,"cleanData.csv")
+
+
+```
+
+# Model Building
+
+# New Target Variable
+
+```{r}
+hist(newsData$shares)
+hist(log(newsData$shares))
+
+temp <- read.csv("cleandata.csv")
+temp$log_shares <- log(newsData$shares)
+temp$X <- NULL
+
+write.csv(temp,"cleandatalog.csv")
+```
+
+```{r}
+remove(newsData)
+setwd("C:/Sonya/GW/Data Analysis/Assignments/ProjectFinal")
+newsData <- read.csv("cleandata.csv")
+newsData$X <- NULL
+newsData$data_channel <- factor(newsData$data_channel)
+newsData$weekday <- factor(newsData$weekday)
+newsData$cluster <- factor(newsData$cluster)
+newsData$is_weekend <- factor(newsData$is_weekend)
+
+
+
+```
+
+
+# Forward Stepwise Selection
+```{r}
+library(leaps)
+regfit.fwd <- regsubsets(log_shares~.,newsData,nvmax=40,method="forward")
+summary(regfit.fwd)
+regfit.fwd.summary <- summary(regfit.fwd)
+
+plot(regfit.fwd.summary$cp)
+regfit.fwd.summary$cp
+
+regfit.fwd$vorder
+
+#write.csv(regfit.fwd.summary$which,"logselected.csv")
+
+```
+
+# Backward Stepwise Selection
+```{r}
+library(leaps)
+regfit.bkd <- regsubsets(log_shares~.,newsData,nvmax=40,method="backward")
+summary(regfit.bkd)
+regfit.bkd.summary <- summary(regfit.bkd)
+
+plot(regfit.bkd.summary$cp)
+regfit.bkd.summary$cp
+
+regfit.bkd$vorder
+
+#write.csv(regfit.bkd.summary$which,"selectedb.csv")
+
+```
+
+# LASSO
+```{r}
+library(glmnet)
+lasso.cv <- cv.glmnet(x=data.matrix(newsData[,-40]),
+                      y=data.matrix(newsData[,40]),alpha=1)
+plot(lasso.cv)
+summary(lasso.cv)
+```
+
+# Ridge
+```{r}
+library(glmnet)
+ridge.cv <- cv.glmnet(x=data.matrix(newsData[,-40]),
+                      y=data.matrix(newsData[,40]),alpha=0)
+plot(ridge.cv)
+summary(ridge.cv)
+```
+
+# Model Building
+
+# Linear Regression
+```{r}
+library(boot)
+lm.all <- glm(shares~., data = newsData)
+lm.all.cv <- cv.glm(newsData,lm.all, K = 10)
+lm.all.mse <- lm.all.cv$delta[1]
+lm.all.mse
+
+#forward variables
+lm1 <- glm(log(shares)~0+LDA_03+self_reference_min_shares+kw_max_avg
+           +num_hrefs+LDA_02+data_channel+avg_negative_polarity
+           +average_token_length+global_subjectivity
+           +num_self_hrefs+kw_min_avg+LDA_01+min_positive_polarity
+           +global_rate_positive_words+num_keywords+num_imgs
+           +weekday+n_tokens_content, 
+           data = newsData)
+lm1.cv <- cv.glm(newsData,lm1, K = 50)
+lm1.mse <- lm1.cv$delta[1]
+lm1.mse
+
+summary(lm1)
+
+
+#backward variables
+lm2 <- glm(log(shares)~0+LDA_03+self_reference_min_shares+kw_max_avg
+           +num_hrefs+average_token_length+global_subjectivity
+           +data_channel+avg_negative_polarity+kw_min_avg
+           +num_keywords+min_positive_polarity
+           +global_rate_positive_words+num_imgs+LDA_02
+           +n_tokens_content+weekday, 
+           data = newsData)
+lm2.cv <- cv.glm(newsData,lm2, K = 50)
+lm2.mse <- lm2.cv$delta[1]
+lm2.mse
+
+#Combined best variables. Deleted insignificant ones. Replaced weekdays with is_weekend
+lm3 <- glm(log(shares)~0+LDA_03+self_reference_min_shares
+           +kw_max_avg+num_hrefs+LDA_02+data_channel
+           +avg_negative_polarity+average_token_length
+           +global_subjectivity+num_self_hrefs+kw_min_avg
+           +min_positive_polarity+global_rate_positive_words
+           +num_keywords+num_imgs+is_weekend, 
+           data = newsData)
+lm3.cv <- cv.glm(newsData,lm3, K = 50)
+lm3.mse <- lm3.cv$delta[1]
+lm3.mse
+
+summary(lm3)
+```
+
+# Transformations: Higher Degree Polynomials
+```{r}
+set.seed(5)
+#The same code was used repeatedly for each variable one by one to select the best degree for that variable
+
+vMSE <- rep(0,10)
+for(i in 1:10){
+  templm <- glm(log(shares)~0+LDA_03+self_reference_min_shares
+                +kw_max_avg+num_hrefs+LDA_02+data_channel
+                +avg_negative_polarity+average_token_length
+                +global_subjectivity+num_self_hrefs
+                +kw_min_avg+min_positive_polarity
+                +global_rate_positive_words
+                +num_keywords+poly(num_imgs,i)+is_weekend, 
+                data = newsData)
+  tempCV <- cv.glm(newsData,templm, K = 20)
+  vMSE[i] <- tempCV$delta[1]
+}
+plot(vMSE)
+which.min(vMSE)
+vMSE
+
+
+lm4 <- glm(log(shares)~0+LDA_03+poly(self_reference_min_shares,2)
+           +poly(kw_max_avg,6)+poly(num_hrefs,2)+LDA_02
+           +data_channel+avg_negative_polarity
+           +poly(average_token_length,4)
+           +poly(global_subjectivity,3)+poly(num_self_hrefs,2)
+           +poly(kw_min_avg,4)+poly(min_positive_polarity,2)
+           +poly(global_rate_positive_words,3)
+           +poly(num_keywords,4)+poly(num_imgs,3)+is_weekend, data = newsData)
+lm4.cv <- cv.glm(newsData,lm4, K = 50)
+lm4.mse <- lm4.cv$delta[1]
+lm4.mse
+
+summary(lm4)
+
+#Refining based on insignificant p-values
+lm5 <- glm(log(shares)~0+LDA_03+poly(self_reference_min_shares,2)
+           +poly(kw_max_avg,6)+poly(num_hrefs,2)+LDA_02
+           +data_channel+avg_negative_polarity
+           +poly(global_subjectivity,3)+poly(num_self_hrefs,2)
+           +poly(kw_min_avg,4)+poly(min_positive_polarity,2)
+           +poly(num_keywords,3)+poly(num_imgs,3)+is_weekend, 
+           data = newsData)
+lm5.cv <- cv.glm(newsData,lm5, K = 50)
+lm5.mse <- lm5.cv$delta[1]
+lm5.mse
+
+summary(lm5)
+```
+
+# Splines
+
+```{r}
+library(mgcv)
+lm6 <- gam(log(shares)~0+s(LDA_03)+s(self_reference_min_shares)
+           +s(kw_max_avg)+s(num_hrefs)+s(LDA_02)
+           +data_channel
+           +s(global_subjectivity)+s(num_self_hrefs)
+           +s(kw_min_avg)+s(min_positive_polarity)
+           +s(num_keywords)+s(num_imgs)+is_weekend, 
+           data = newsData)
+summary(lm6)
+
+library(gamclass)
+CVgam(formula(lm6),data = newsData)
+
+```
+
+# Outliers
+
+```{r}
+newsBackup <- newsData
+
+
+plot(lm5,which = 4)
+plot(lm5,which = 5)
+
+
+ind <- c(5675,16282,16295)
+newsData <- newsData[-ind,]
+
+ind <- c(6132,18038,34419)
+newsData <- newsData[-ind,]
+
+
+```
+
+# Quantile Regression
+```{r}
+library(quantreg)
+
+lm7 <- rq(log(shares)~0+LDA_03+self_reference_min_shares+kw_max_avg
+           +num_hrefs+LDA_02+data_channel
+           +average_token_length+global_subjectivity
+           +num_self_hrefs+kw_min_avg+LDA_01+min_positive_polarity
+           +num_keywords+num_imgs
+           +weekday+n_tokens_content,data=newsData)
+
+plot(log(newsData$shares))
+abline(lm6,col=2)
+abline(lm7,lwd=3,col=4)
+
+
+lm7.summary <- summary.rq(lm7)
+mse7 <- sum(lm7$residuals ^ 2) / lm7.summary$rdf
+mse7
+
+```
+
+# Model Assumptions
+
+```{r}
+summary(lm5)
+
+#normality
+hist(lm5$residuals)
+plot(lm5,which = 2)
+shapiro.test(sample(lm5$residuals,5000))
+#The residuals are not normal
+
+#linearity
+plot(lm5,which = 1)
+#Homoskedasticity
+plot(lm5,which=3)
+#The variance of residuals is not constant
+
+gam.check(lm6)
+shapiro.test(sample(lm6$residuals,5000))
+```
+
+# Bootstrapping for Confidence Interval
+
+```{r}
+confint(lm6)
+
+library(boot)
+bs <- function(data, i) {
+  d <- data[i,] # allows boot to select sample
+  fit <- gam(log(shares)~0+s(LDA_03)
+             +s(self_reference_min_shares)
+           +s(kw_max_avg)+s(num_hrefs)+s(LDA_02)
+           +data_channel
+           +s(global_subjectivity)+s(num_self_hrefs)
+           +s(kw_min_avg)+s(min_positive_polarity)
+           +s(num_keywords)+s(num_imgs)+is_weekend, 
+           data = d)
+  return(coef(fit))
+}
+bootResults <- boot(data=newsData,statistic=bs,stype="i",R=100)
+boot.ci(bootResults, type="norm", index=1)
+```
+
+
+```{r}
+confint(lm5)
+
+bs <- function(data, i) {
+  d <- data[i,] # allows boot to select sample
+  fit <- glm(log(shares)~0+LDA_03+poly(self_reference_min_shares,2)
+           +poly(kw_max_avg,6)+poly(num_hrefs,2)+LDA_02
+           +data_channel+avg_negative_polarity
+           +poly(global_subjectivity,3)+poly(num_self_hrefs,2)
+           +poly(kw_min_avg,4)+poly(min_positive_polarity,2)
+           +poly(num_keywords,3)+poly(num_imgs,3)+is_weekend, 
+           data = d)
+  return(coef(fit))
+}
+bootResults <- boot(data=newsData,statistic=bs,stype="i",R=100)
+boot.ci(bootResults, type="norm", index=1)
+
+```
+
+# Huge Package
+```{r}
+library(huge)
+
+setwd("C:/Sonya/GW/Data Analysis/Assignments/ProjectFinal")
+hugeData <- read.csv("cleandata.csv")
+hugeData$X <- NULL
+
+
+obj <- huge(as.matrix(hugeData),nlambda=50, method = "mb")
+plot.huge(obj)
+```
+
+# Bonus Methods
+
+## rpart and rms
+
+```{r}
+# Classification Tree with rpart
+library(rpart)
+
+# grow tree 
+fit <- rpart(log(shares) ~ .,method="anova", model = TRUE, data=newsData)
+
+printcp(fit) # display the results 
+plotcp(fit) # visualize cross-validation results 
+summary.fit <- summary(fit) # detailed summary of splits
+
+library(rms)
+validate(fit)
+
+# plot tree 
+plot(fit, uniform=TRUE, 
+  	main="Classification Tree for news data")
+text(fit, use.n=TRUE, all=TRUE, cex=.8)
+
+```
+
+## randomForest
+
+```{r}
+library(randomForest)
+
+rf.mdl <- randomForest(newsData[,1:40], log(newsData[,41]), ntree=200) 
+
+rf.mdl$mse
+
+rf.mdl$rsq
+```
+
+## neuralnet
+
+```{r}
+
+library(neuralnet)
+n <- names(newsData)
+f <- as.formula(paste("log(shares) ~", paste(n[!n %in% "shares"], collapse = " + ")))
+nn <- neuralnet(f,data=hugeData,hidden=3,linear.output=T)
+
+pr.nn <- compute(nn,hugeData[,1:40])
+pr.nn_ <- pr.nn$net.result*(max(log(hugeData$shares))-min(log(hugeData$shares)))+min(log(hugeData$shares))
+
+test.r <- (log(hugeData$shares))*(max(log(hugeData$shares))-min(log(hugeData$shares)))+min(log(hugeData$shares))
+
+mse.nn <- sum((test.r - pr.nn_)^2)/nrow(hugeData)
+mse.nn
+```
+
